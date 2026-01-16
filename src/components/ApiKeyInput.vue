@@ -8,13 +8,23 @@ const isSubmitting = ref(false);
 const validationError = ref("");
 
 const apiKeyModel = defineModel("apiKey", { default: "" });
-const savedApiKey = useLocalStorage("claude-api-key", apiKeyModel);
-inputValue.value = savedApiKey.value;
+const providerModel = defineModel("provider", { default: "claude" });
 
-const API_KEY_REGEX = /^sk-ant-api03-.+$/;
+const savedApiKey = useLocalStorage("ai-api-key", apiKeyModel);
+const savedProvider = useLocalStorage("ai-provider", providerModel);
+
+inputValue.value = savedApiKey.value;
+const selectedProvider = ref(savedProvider.value);
+
+const CLAUDE_API_KEY_REGEX = /^sk-ant-api03-.+$/;
+const GEMINI_API_KEY_REGEX = /^AIza[0-9A-Za-z\-_]{35}$/;
 
 const hasValidKey = computed(() => {
-  return API_KEY_REGEX.test(inputValue.value);
+  const regex =
+    selectedProvider.value === "claude"
+      ? CLAUDE_API_KEY_REGEX
+      : GEMINI_API_KEY_REGEX;
+  return regex.test(inputValue.value);
 });
 
 const validateApiKey = (): boolean => {
@@ -26,8 +36,13 @@ const validateApiKey = (): boolean => {
   }
 
   if (!hasValidKey.value) {
-    validationError.value =
-      'Invalid API Key format. Must start with "sk-ant-api03-" and be at least 100 characters long.';
+    if (selectedProvider.value === "claude") {
+      validationError.value =
+        'Invalid API Key format. Must start with "sk-ant-api03-" and be at least 100 characters long.';
+    } else {
+      validationError.value =
+        'Invalid API Key format. Must start with "AIza" followed by 35 characters.';
+    }
     return false;
   }
 
@@ -43,6 +58,7 @@ const handleSubmit = async () => {
 
   try {
     savedApiKey.value = inputValue.value.trim();
+    savedProvider.value = selectedProvider.value;
 
     emit("apiKeySubmitted", inputValue.value.trim());
 
@@ -74,7 +90,8 @@ const emit = defineEmits<{
         API Key Configuration
       </h2>
       <p class="text-gray-600">
-        Enter your Claude API key to generate personalized articles.
+        Select your AI provider and enter your API key to generate personalized
+        articles.
       </p>
     </div>
 
@@ -110,17 +127,37 @@ const emit = defineEmits<{
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <div>
         <label
+          for="provider"
+          class="block text-sm font-medium text-gray-700 mb-2"
+        >
+          AI Provider *
+        </label>
+        <select
+          id="provider"
+          v-model="selectedProvider"
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+          required
+        >
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="gemini">Gemini (Google)</option>
+        </select>
+      </div>
+
+      <div>
+        <label
           for="apiKey"
           class="block text-sm font-medium text-gray-700 mb-2"
         >
-          Claude API Key *
+          {{ selectedProvider === "claude" ? "Claude" : "Gemini" }} API Key *
         </label>
         <div class="relative">
           <input
             id="apiKey"
             v-model="inputValue"
             :type="showKey ? 'text' : 'password'"
-            placeholder="sk-ant-api03-..."
+            :placeholder="
+              selectedProvider === 'claude' ? 'sk-ant-api03-...' : 'AIza...'
+            "
             required
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 pr-12"
             :class="{
@@ -257,7 +294,7 @@ const emit = defineEmits<{
         </svg>
         <div class="text-sm text-blue-800">
           <p class="font-medium mb-1">How to get your API Key?</p>
-          <p>
+          <p v-if="selectedProvider === 'claude'">
             Visit
             <a
               href="https://console.anthropic.com/"
@@ -266,6 +303,15 @@ const emit = defineEmits<{
               >console.anthropic.com</a
             >, create an account and generate a new API key in the settings
             section.
+          </p>
+          <p v-else>
+            Visit
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              class="underline hover:no-underline"
+              >aistudio.google.com</a
+            >, sign in with your Google account and create a new API key.
           </p>
         </div>
       </div>
